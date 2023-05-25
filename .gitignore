@@ -1,3 +1,13 @@
+.DS_Store
+.chroma/
+# Secrets
+.streamlit/secrets.toml
+.env
+# VSCode
+.vscode/
+# TODO
+TODO.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
