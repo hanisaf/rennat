@@ -26,6 +26,7 @@ def inquire(query, index, temperature=0.0, k=5,
         print("\nPROVIDED SOURCES:")
         for doc in sources:
             print(doc.metadata['source'], doc.page_content)  
+            print()
     return text
 
 
@@ -46,6 +47,7 @@ def refine(query, index, temperature=0.0, k=5, verbose=False,
         print("\nPROVIDED SOURCES:")
         for doc in sources:
             print(doc.metadata['source'], doc.page_content) 
+            print()
     return text 
 
 

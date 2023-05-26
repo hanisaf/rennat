@@ -7,6 +7,8 @@
 .vscode/
 # TODO
 TODO.md
+rennat/scrap.ipynb
+temp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
