@@ -8,14 +8,15 @@ from typing import Any, Dict, List, Optional
 import docx2txt
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.docstore.document import Document
-from langchain.llms import OpenAI
+from langchain.llms import OpenAI, BaseLLM
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import VectorStore
 from langchain.vectorstores.faiss import FAISS
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.prompts import PromptTemplate
+from langchain.chat_models import ChatOpenAI
 from pypdf import PdfReader
-from rennat.embeddings import OpenAIEmbeddings, HuggingFaceHubEmbeddings
+from embeddings import OpenAIEmbeddings, HuggingFaceHubEmbeddings
 
 
 def parse_file(file: str) -> List[str]:
@@ -145,10 +146,12 @@ def search_docs(index: VectorStore, query: str, k:int = 5) -> List[Document]:
     return docs
 
 @lru_cache()
-def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo") -> OpenAI:
+def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo") -> BaseLLM:
     """Gets an OpenAI LLM model."""
+    load_env()
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    llm = OpenAI(
+    model = ChatOpenAI if model_name == "gpt-3.5-turbo" else OpenAI
+    llm = model(
         temperature=temperature, openai_api_key=OPENAI_API_KEY, model_name=model_name,
         streaming=True, callbacks=[StreamingStdOutCallbackHandler()]
     )  # type: ignore

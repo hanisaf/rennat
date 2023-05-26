@@ -1,5 +1,5 @@
-from rennat import prompts
-from rennat.utils import *
+import prompts
+from utils import *
 
 
 def inquire(query, index, temperature=0.0, k=5, 
