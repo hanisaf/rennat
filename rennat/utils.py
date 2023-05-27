@@ -233,15 +233,21 @@ def search_docs(index: FAISS, query: str, k:int = 5, meta_names : List[str] = No
         docs = [doc for doc in docs if len(doc.page_content) > min_length]
     return docs[:n]
 
+def select_docs(index: FAISS, name:str) -> List[Document]:
+    """Selects documents with a specific name."""
+    docs = [doc for doc in index.docstore._dict.values() if doc.metadata['name'] == name]
+    return docs
+
 @lru_cache()
-def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo") -> BaseLLM:
+def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo", streaming=True) -> BaseLLM:
     """Gets an OpenAI LLM model."""
     load_env()
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     model = ChatOpenAI if model_name == "gpt-3.5-turbo" else OpenAI
+    callbacks = [StreamingStdOutCallbackHandler()] if streaming else []
     llm = model(
         temperature=temperature, openai_api_key=OPENAI_API_KEY, model_name=model_name,
-        streaming=True, callbacks=[StreamingStdOutCallbackHandler()]
+        streaming=True, callbacks=callbacks
     )  # type: ignore
     return llm
 

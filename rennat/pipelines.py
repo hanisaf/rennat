@@ -32,13 +32,15 @@ def inquire(query, index, sources=None, temperature=0.0, k=5,
     return text
 
 
-def refine(query, index, temperature=0.0, k=5, verbose=False,
-            print_sources=True):
-    llm = get_llm(temperature=temperature)
-    sources = search_docs(index, query, k=k)
+def refine(query, index,  sources=None, temperature=0.0, k=5, 
+           meta_names : List[str] = None, min_length=0,
+           streaming=True, verbose=False, print_sources=True):
+    llm = get_llm(temperature=temperature, model_name="text-babbage-001", streaming=streaming)
+    if not sources:
+        sources = search_docs(index, query, k=k, meta_names=meta_names, min_length=min_length)
     chain = load_qa_with_sources_chain(llm, chain_type="refine", verbose=verbose)
     answer = chain(
-        {"input_documents": sources, "question": query}, return_only_outputs=True
+        {"input_documents": sources, "question": query}, return_only_outputs=False
     )
     text = answer["output_text"].strip()
 
@@ -50,6 +52,7 @@ def refine(query, index, temperature=0.0, k=5, verbose=False,
         for doc in sources:
             print(doc.metadata['source'], doc.page_content) 
             print()
+
     return text 
 
 
