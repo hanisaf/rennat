@@ -7,7 +7,7 @@
 .vscode/
 # TODO
 TODO.md
-rennat/scrap.ipynb
+rennat/scrap*.ipynb
 temp/
 
 # Byte-compiled / optimized / DLL files

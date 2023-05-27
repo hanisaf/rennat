@@ -2,11 +2,12 @@ import prompts
 from utils import *
 
 
-def inquire(query, index, temperature=0.0, k=5, 
+def inquire(query, index, sources=None, temperature=0.0, k=5, 
             chain_type="stuff", prompt=prompts.QA_PROMPT, verbose=False,
             print_sources=True):
     llm = get_llm(temperature=temperature)
-    sources = search_docs(index, query, k=k)
+    if not sources:
+        sources = search_docs(index, query, k=k)
     chain = load_qa_with_sources_chain(
         llm,
         chain_type=chain_type,
