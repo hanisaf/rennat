@@ -213,19 +213,25 @@ def search_meta(index: VectorStore, query: str | List[str], how: str = "and") ->
             matches += [name for name in names if text_match(q, name, how=how)]
     return matches
 
-@lru_cache()
-def get_doc_names(index: VectorStore) -> List[str]:
+def get_doc_names(index: FAISS) -> List[str]:
     """Gets a list of document names from a FAISS index."""
     existing_docs = {doc.metadata['name']  for doc in index.docstore._dict.values()}
     return existing_docs
 
-@lru_cache()
-def search_docs(index: VectorStore, query: str, k:int = 5) -> List[Document]:
+def search_docs(index: FAISS, query: str, k:int = 5, meta_names : List[str] = None, min_length=0) -> List[Document]:
     """Searches a FAISS index for similar chunks to the query
     and returns a list of Documents."""
     # Search for similar chunks
+    n=k
+    # broad search then narrow down
+    if min_length or meta_names:
+        k = len(index.docstore._dict)
     docs = index.similarity_search(query, k=k)
-    return docs
+    if meta_names:
+        docs = [doc for doc in docs if doc.metadata['name'] in meta_names]
+    if min_length:
+        docs = [doc for doc in docs if len(doc.page_content) > min_length]
+    return docs[:n]
 
 @lru_cache()
 def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo") -> BaseLLM:
