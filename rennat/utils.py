@@ -3,6 +3,7 @@
 from copy import deepcopy
 from functools import lru_cache, reduce
 import re, os, dotenv
+from bs4 import BeautifulSoup
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Set
 import numpy as np
@@ -30,8 +31,19 @@ def parse_file(file: str) -> List[str]:
             return [parse_docx(f)]
         elif ext == ".txt":
             return [parse_txt(f)]
+        elif ext == ".html":
+            return [parse_html(f)]
         else:
             raise ValueError(f"Unknown file extension: {ext}")
+
+def parse_html(file: BytesIO) -> str:
+    # using BeautifulSoup to parse the HTML
+    soup = BeautifulSoup(file, 'html.parser')
+    # get the text out of the soup
+    text = soup.get_text()
+    # Remove multiple newlines
+    text = re.sub(r"\n\s*\n", "\n\n", text)
+    return text
 
 def parse_docx(file: BytesIO) -> str:
     text = docx2txt.process(file)
@@ -104,9 +116,12 @@ def text_to_docs(text: str | List[str], name: Optional[str] = None) -> List[Docu
             doc_chunks.append(doc)
     return doc_chunks
 
-def load_env():
+def load_env(key:str=None):
     """Loads the environment variables from a .env file"""
-    dotenv.load_dotenv()
+    if key:
+        os.environ["OPENAI_API_KEY"] = key
+    else:
+        dotenv.load_dotenv()
     if not os.getenv("OPENAI_API_KEY"):
         raise Exception("No OpenAI API key found. Please add it to a .env file.")
 
@@ -233,21 +248,15 @@ def search_docs(index: FAISS, query: str, k:int = 5, meta_names : List[str] = No
         docs = [doc for doc in docs if len(doc.page_content) > min_length]
     return docs[:n]
 
-def select_docs(index: FAISS, name:str) -> List[Document]:
-    """Selects documents with a specific name."""
-    docs = [doc for doc in index.docstore._dict.values() if doc.metadata['name'] == name]
-    return docs
-
 @lru_cache()
-def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo", streaming=True) -> BaseLLM:
+def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo") -> BaseLLM:
     """Gets an OpenAI LLM model."""
     load_env()
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     model = ChatOpenAI if model_name == "gpt-3.5-turbo" else OpenAI
-    callbacks = [StreamingStdOutCallbackHandler()] if streaming else []
     llm = model(
         temperature=temperature, openai_api_key=OPENAI_API_KEY, model_name=model_name,
-        streaming=True, callbacks=callbacks
+        streaming=True, callbacks=[StreamingStdOutCallbackHandler()]
     )  # type: ignore
     return llm
 
