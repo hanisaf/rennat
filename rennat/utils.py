@@ -164,57 +164,6 @@ def text_match(text1: str, text2: str, how: str = "and"):
     else:
         raise ValueError(f"Unknown how: {how}")
 
-def remove(
-    vectorstore: FAISS,
-    target_names: Set[str]
-):
-    # https://github.com/hwchase17/langchain/issues/2699
-    id_to_remove = []
-    for _id, doc in vectorstore.docstore._dict.items():
-        if doc.metadata['name'] in target_names:
-            id_to_remove.append(_id)
-    docstore_id_to_index = {
-        v: k for k, v in vectorstore.index_to_docstore_id.items()
-    }
-    n_removed = len(id_to_remove)
-    n_total = vectorstore.index.ntotal
-    for _id in id_to_remove:
-        # remove the document from the docstore
-        del vectorstore.docstore._dict[
-            _id
-        ]
-        # remove the embedding from the index
-        ind = docstore_id_to_index[_id]
-        vectorstore.index.remove_ids(
-            np.array([ind], dtype=np.int64)
-        ) 
-        # remove the index to docstore id mapping
-        del vectorstore.index_to_docstore_id[
-            ind
-        ] 
-    # reorder the mapping
-    vectorstore.index_to_docstore_id = {
-        i: _id
-        for i, _id in enumerate(vectorstore.index_to_docstore_id.values())
-    }
-    return n_removed, n_total
-
-
-def restrict_index(index: VectorStore, names: List[str]) -> VectorStore:
-    """Restricts a FAISS index to documents with specific names"""
-    #TODO this is broken, need to figure out how to retrict the index without re-embedding
-    # # copy the index using deepcopy
-    # new_index = deepcopy(index)
-    # removed = get_doc_names(index) - set(names)
-    # n_removed, n_total = remove(new_index, removed)
-    # print(n_removed, n_total)
-    # return new_index
-    # temp solution, recreate the index
-    doc_names = search_meta(index, names)
-    # get the documents with matching names in metadata
-    docs =  [doc  for doc in index.docstore._dict.values() if doc.metadata['name'] in doc_names]
-    return embed_docs(docs)
-
 def search_meta(index: VectorStore, query: str | List[str], how: str = "and") -> List[Document]:
     """Search based on the name of the document."""
     names = get_doc_names(index)
@@ -233,17 +182,19 @@ def get_doc_names(index: FAISS) -> List[str]:
     existing_docs = {doc.metadata['name']  for doc in index.docstore._dict.values()}
     return existing_docs
 
-def search_docs(index: FAISS, query: str, k:int = 5, meta_names : List[str] = None, min_length=0) -> List[Document]:
+def search_docs(index: FAISS, query: str, k:int = 5, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
     """Searches a FAISS index for similar chunks to the query
     and returns a list of Documents."""
     # Search for similar chunks
     n=k
     # broad search then narrow down
-    if min_length or meta_names:
+    if min_length or meta_names or exclude_names:
         k = len(index.docstore._dict)
     docs = index.similarity_search(query, k=k)
     if meta_names:
         docs = [doc for doc in docs if doc.metadata['name'] in meta_names]
+    if exclude_names:
+        docs = [doc for doc in docs if doc.metadata['name'] not in exclude_names]
     if min_length:
         docs = [doc for doc in docs if len(doc.page_content) > min_length]
     return docs[:n]

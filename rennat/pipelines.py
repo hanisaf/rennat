@@ -3,12 +3,12 @@ from utils import *
 
 
 def inquire(query, index, sources=None, temperature=0.0, k=5, 
-            meta_names : List[str] = None, min_length=0,
+            meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0,
             chain_type="stuff", prompt=prompts.QA_PROMPT, verbose=False,
             print_sources=True):
     llm = get_llm(temperature=temperature)
     if not sources:
-        sources = search_docs(index, query, k=k, meta_names=meta_names, min_length=min_length)
+        sources = search_docs(index, query, k=k, meta_names=meta_names, exclude_names=exclude_names, min_length=min_length)
     chain = load_qa_with_sources_chain(
         llm,
         chain_type=chain_type,
@@ -33,11 +33,11 @@ def inquire(query, index, sources=None, temperature=0.0, k=5,
 
 
 def refine(query, index,  sources=None, temperature=0.0, k=5, 
-           meta_names : List[str] = None, min_length=0,
+           meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0,
            streaming=True, verbose=False, print_sources=True):
     llm = get_llm(temperature=temperature, model_name="text-babbage-001", streaming=streaming)
     if not sources:
-        sources = search_docs(index, query, k=k, meta_names=meta_names, min_length=min_length)
+        sources = search_docs(index, query, k=k, meta_names=meta_names, exclude_names=exclude_names, min_length=min_length)
     chain = load_qa_with_sources_chain(llm, chain_type="refine", verbose=verbose)
     answer = chain(
         {"input_documents": sources, "question": query}, return_only_outputs=False
