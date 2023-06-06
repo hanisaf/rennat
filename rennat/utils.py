@@ -200,14 +200,14 @@ def search_docs(index: FAISS, query: str, k:int = 5, meta_names : List[str] = No
     return docs[:n]
 
 @lru_cache()
-def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo") -> BaseLLM:
+def get_llm(temperature:float=0.0, model_name= "gpt-3.5-turbo", streaming=True) -> BaseLLM:
     """Gets an OpenAI LLM model."""
     load_env()
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     model = ChatOpenAI if model_name == "gpt-3.5-turbo" else OpenAI
     llm = model(
         temperature=temperature, openai_api_key=OPENAI_API_KEY, model_name=model_name,
-        streaming=True, callbacks=[StreamingStdOutCallbackHandler()]
+        streaming=streaming, callbacks=[StreamingStdOutCallbackHandler()]
     )  # type: ignore
     return llm
 
