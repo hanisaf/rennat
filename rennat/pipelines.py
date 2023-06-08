@@ -4,11 +4,13 @@ from utils import *
 
 def inquire(query, index, sources=None, temperature=0.0, k=5, 
             meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0,
-            chain_type="stuff", prompt=prompts.QA_PROMPT, verbose=False,
+            chain_type="stuff", short=False, prompt=prompts.QA_PROMPT, verbose=False,
             print_sources=True):
     llm = get_llm(temperature=temperature)
     if not sources:
         sources = search_docs(index, query, k=k, meta_names=meta_names, exclude_names=exclude_names, min_length=min_length)
+    if short:
+        prompt = prompts.SHORT_QA_PROMPT
     chain = load_qa_with_sources_chain(
         llm,
         chain_type=chain_type,

@@ -2,7 +2,7 @@
 
 from utils import create_template
 
-SHORT_QA_PROMPT =  create_template("""Create a short final answer to the given questions using the provided sources. 
+BASE_PROMPT = """Create a /length/ final answer to the given questions using the provided sources.
 
 QUESTION: {question}
 =========
@@ -10,18 +10,12 @@ SOURCES:
 
 {summaries}
 =========
-FINAL ANSWER:""")
+FINAL ANSWER:"""
+
+SHORT_QA_PROMPT =  create_template(BASE_PROMPT.replace("/length/", "short"))
 
 
-QA_PROMPT =  create_template("""Create an elaborate final answer to the given questions using the provided sources. 
-
-QUESTION: {question}
-=========
-SOURCES:
-
-{summaries}
-=========
-FINAL ANSWER:""")
+QA_PROMPT =  create_template(BASE_PROMPT.replace("/length/", "detailed"))
 
 DETAILED_PROMPT = create_template("""Create an elaborate final answer in bullet list form to the given questions using the provided sources.
 
