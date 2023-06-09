@@ -68,7 +68,6 @@ def parse_pdf(file: BytesIO) -> List[str]:
 
     return output
 
-
 def parse_txt(file: BytesIO) -> str:
     text = file.read().decode("utf-8")
     # Remove multiple newlines
@@ -129,9 +128,7 @@ def embed_docs(docs: List[Document], openai_embeddings=True, persist_directory=N
     """Embeds a list of Documents and returns a FAISS index"""
     embeddings = OpenAIEmbeddings() if openai_embeddings else HuggingFaceHubEmbeddings()
     index = FAISS.from_documents(docs, embeddings)
-    return index
-
-        
+    return index        
 
 def load_store(save_dir : str, openai_embeddings=True) -> VectorStore:
     """Loads index from a save directory"""
