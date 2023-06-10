@@ -1,4 +1,5 @@
-langchain>=0.0.179
+langchain==0.0.180
+chromadb==0.3.25
 faiss-cpu>=1.7.3
 openai>=0.26.2
 docx2txt>=0.8
@@ -7,6 +8,7 @@ pypdf>=3.3.0
 tenacity>=8.2.0
 path>=16.6.0
 tiktoken>=0.4.0
-transformers>=4.29.2
+transformers>=4.30
 python-dotenv>=0.21.1
+bs4
 
