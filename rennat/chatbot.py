@@ -20,6 +20,9 @@ class ChatBot:
         self.llm = get_llm()
         self.messages = [HumanMessage(content=f"You are {name}")]
 
+    def inform(self, message:str):
+        self.messages.append(HumanMessage(content=message))
+
     def chat(self, message:str):
         self.messages.append(HumanMessage(content=message))
         result = self.llm(self.messages)
@@ -37,6 +40,6 @@ if __name__ == "__main__":
     while True:
         message = input("You: ")
         response = bot.chat(message)
-        print(f"\n{bot.name}: {bot.chat(message)}")
+        print(f"\n{bot.name}: {response}")
 
     

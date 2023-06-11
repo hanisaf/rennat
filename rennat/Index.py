@@ -22,7 +22,8 @@ class Index:
     def __init__(self, index_file: str = None, collection_name: str = "references", openai_token:str = None) -> None:
         self.client = chromadb.Client(Settings(
             chroma_db_impl="duckdb+parquet",
-            persist_directory=index_file
+            persist_directory=index_file,
+            anonymized_telemetry=False,
         ))
         self.switch_collection(collection_name)
         if not openai_token:
@@ -83,18 +84,10 @@ class Index:
         
         description = "a" if not modifier else "an " + modifier if modifier[0] in "aeiou" else "a " + modifier
         prompt = Prompts.BASE_PROMPT.replace("/description/", description)
-        max_words = 4096 / 2 # https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them 
         prompt_words = len(re.split("\W", prompt))
-        remaining_words = max_words - prompt_words
-
-        i = 0
-        for doc in sources:
-            doc_words = len(re.split("\W", doc.page_content)) 
-            if doc_words < remaining_words:
-                i += 1
-                remaining_words -= doc_words
-        i = min(i, len(sources))
-        sources = sources[:i] # truncate sources to fit in prompt
+        remaining_tokens = 4096 - prompt_words * 2
+        i = Util.max_sources(sources, remaining_tokens)
+        sources = sources[:i - 2] # -2 to provide some fodder for chat
 
         prompt_template = Prompts.template_from_str(prompt)
         chain = load_qa_with_sources_chain(
@@ -117,7 +110,7 @@ class Index:
 
         return text, papers, sources
 
-    def search_docs(self, query: str, k:int = 1000, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
+    def search_docs(self, query: str, k:int = 500, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
         """Searches index for similar chunks to the query
         and returns a list of Documents."""
 
@@ -291,6 +284,27 @@ class Util:
             token = os.getenv("OPENAI_API_KEY")
         return token
         
+    @staticmethod
+    def total_words(docs: List[Document]) -> int:
+        words = 0
+        for doc in docs:
+            words += len(re.split("\W", doc.page_content)) 
+            words += len(re.split("\W", doc.metadata["source"]))
+        return words + 2
+    
+    @staticmethod
+    def estimated_tokens(docs: List[Document]) -> int:
+        # https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them 
+        return Util.total_words(docs) * 2
+    
+    @staticmethod
+    def max_sources(docs: List[Document], max_tokens = 4096) -> int:
+        for i in range(len(docs)):
+            if Util.estimated_tokens(docs[:i]) > max_tokens:
+                break
+        return i - 1
+
+    
 class Prompts:
     BASE_PROMPT = """Create /description/ final answer to the given questions using the provided sources.
 QUESTION: {question}
