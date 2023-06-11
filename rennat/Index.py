@@ -70,18 +70,17 @@ class Index:
         """Gets an OpenAI LLM model."""
         model = ChatOpenAI if model_name == "gpt-3.5-turbo" else OpenAI
         llm = model(
-            temperature=temperature, openai_api_key=self.openai_api_key, model_name=model_name,
+            temperature=temperature, openai_api_key=self.openai_token, model_name=model_name,
             streaming=streaming, callbacks=[StreamingStdOutCallbackHandler()]
         )  
         return llm
 
-    def answer(self, query: str, sources: List[Document] = None, modifier="detailed", verbose=False):
+    def answer(self, query: str, sources: List[Document] = None, modifier="", verbose=False):
         if not self.llm:
             self.llm = self.get_llm()
         if not sources:
             sources = self.search_docs(query)
         
-        modifier = modifier.replace("_", " ")
         description = "a" if not modifier else "an " + modifier if modifier[0] in "aeiou" else "a " + modifier
         prompt = Prompts.BASE_PROMPT.replace("/description/", description)
         max_words = 4096 / 2 # https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them 
@@ -118,31 +117,30 @@ class Index:
 
         return text, papers, sources
 
-    def search_docs(self, query: str, k:int = 100, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
+    def search_docs(self, query: str, k:int = 1000, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
         """Searches index for similar chunks to the query
         and returns a list of Documents."""
-        # Search for similar chunks
-        n=k
-        # broad search then narrow down
-        if min_length or meta_names or exclude_names:
-            k = self.size()
 
-        #TODO investigate
+
+        k = min(k, self.size())
+
+        #TODO investigate why this is not working
         # results = self.collection.query(
         #     query_texts=[query],
-        #     n_results=k
+        #     n_results=k - 1
         # )
-
+        # # assemble a list of documents from results
+        # ids = results['ids'][0] # only one query text
+        # metadatas = results['metadatas'][0] # only one query text
+        # texts = results['documents'][0] # only one query text
+        # docs = [Document(
+        #             page_content=texts[i], metadata=metadatas[i], id=ids[i]
+        #         ) for i in range(len(results))]
+                
         chroma = self.get_langchain_chroma()
-        results = chroma.similarity_search(query, k=k//10)
+        docs = chroma.similarity_search(query, k=k - 1)
 
-        # assemble a list of documents from results
-        ids = results['ids']
-        metadatas = results['metadatas']
-        texts = results['documents']
-        docs = [Document(
-                    page_content=texts[i], metadata=metadatas[i], id=ids[i]
-                ) for i in range(len(results))]
+
         # filter out documents that don't meet the criteria        
         if meta_names:
             docs = [doc for doc in docs if doc.metadata['name'] in meta_names]
@@ -150,7 +148,7 @@ class Index:
             docs = [doc for doc in docs if doc.metadata['name'] not in exclude_names]
         if min_length:
             docs = [doc for doc in docs if len(doc.page_content) > min_length]
-        return docs[:n]
+        return docs
 
     def get_file_names(self) -> List[str]:
         """Gets a list of file names."""

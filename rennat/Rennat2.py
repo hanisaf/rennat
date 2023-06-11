@@ -16,6 +16,12 @@ class Rennat:
             meta = input("Please enter meta data criteria, enter to skip: ")
             if meta:
                 meta = meta.split(',')
+
+        modifier = ""
+        if query.startswith('%'):
+            modifier = query.partition(' ')[0][1:].replace("_", " ")
+            query = query.partition(' ')[-1].strip()
+            
         meta_names = None
         if meta:
             meta_names = self.index.search_meta(meta)
@@ -25,8 +31,8 @@ class Rennat:
                 print(i, '-', m)
                 i += 1
         print()
-        k = self.index.size()
-        docs =  self.index.search_docs(query, k=k, meta_names=meta_names)
+
+        docs =  self.index.search_docs(query, meta_names=meta_names)
         # obtain a unique list of documents name from metadata
         doc_names = []
         for doc in docs:
@@ -49,8 +55,8 @@ class Rennat:
                 selected = [int(s) for s in selected]
                 doc_names = [doc_names[i] for i in selected]
                 docs = [doc for doc in docs if doc.metadata['name'] in doc_names]
-
-        text, papers, sources = self.index.answer(query, docs)
+        
+        text, papers, sources = self.index.answer(query, docs, modifier=modifier)
 
 
         print()
@@ -60,7 +66,6 @@ class Rennat:
             print()
 
         print("\nSELECTED SOURCES:")
-        papers = []
         i = 0
         for paper in papers:
             print(i, '-', paper)
