@@ -1,25 +1,37 @@
-from functools import lru_cache, reduce
+from functools import reduce
 from io import BytesIO
 from typing import List, Optional
 import uuid, os, re
 from bs4 import BeautifulSoup
 import chromadb
 from chromadb.config import Settings
+import dotenv
+from langchain import PromptTemplate
 from langchain.docstore.document import Document
 from langchain.vectorstores.chroma import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import docx2txt
 from pypdf import PdfReader
 from tqdm import tqdm
-
+from langchain.llms import OpenAI, BaseLLM
+from langchain.chat_models import ChatOpenAI
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 
 class Index:
-    def __init__(self, index_file: str = None, collection_name: str = "mycollection") -> None:
+    def __init__(self, index_file: str = None, collection_name: str = "references", openai_token:str = None) -> None:
         self.client = chromadb.Client(Settings(
             chroma_db_impl="duckdb+parquet",
             persist_directory=index_file
         ))
+        self.switch_collection(collection_name)
+        if not openai_token:
+            self.openai_token = Util.seek_openai_token()
+        else:
+            self.openai_token = openai_token
+        self.llm = None
 
+    def switch_collection(self, collection_name: str) -> None:
         self.collection_name = collection_name
         self.collection = self.client.get_or_create_collection(name=collection_name)
 
@@ -39,30 +51,91 @@ class Index:
         docs = []
         for f in tqdm(files):
             try:
-                text = Index.parse_file(f)
+                text = Util.parse_file(f)
                 fn = os.path.basename(f)
                 if verbose:
                     print("Processing ", fn, "...")
-                doc = Index.text_to_docs(text, fn)
+                doc = Util.text_to_docs(text, fn)
                 docs.extend(doc)
             except Exception as e:
                 print("Error processing ", fn, ": ", e)
         if docs: # not empty
             self.add_documents(docs)
 
-    def search_docs(self, query: str, k:int = 5, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
+    def size(self):
+        return self.collection.count()
+    
+    
+    def get_llm(self, temperature:float=0.0, model_name= "gpt-3.5-turbo", streaming=True) -> BaseLLM:
+        """Gets an OpenAI LLM model."""
+        model = ChatOpenAI if model_name == "gpt-3.5-turbo" else OpenAI
+        llm = model(
+            temperature=temperature, openai_api_key=self.openai_api_key, model_name=model_name,
+            streaming=streaming, callbacks=[StreamingStdOutCallbackHandler()]
+        )  
+        return llm
+
+    def answer(self, query: str, sources: List[Document] = None, modifier="detailed", verbose=False):
+        if not self.llm:
+            self.llm = self.get_llm()
+        if not sources:
+            sources = self.search_docs(query)
+        
+        modifier = modifier.replace("_", " ")
+        description = "a" if not modifier else "an " + modifier if modifier[0] in "aeiou" else "a " + modifier
+        prompt = Prompts.BASE_PROMPT.replace("/description/", description)
+        max_words = 4096 / 2 # https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them 
+        prompt_words = len(re.split("\W", prompt))
+        remaining_words = max_words - prompt_words
+
+        i = 0
+        for doc in sources:
+            doc_words = len(re.split("\W", doc.page_content)) 
+            if doc_words < remaining_words:
+                i += 1
+                remaining_words -= doc_words
+        i = min(i, len(sources))
+        sources = sources[:i] # truncate sources to fit in prompt
+
+        prompt_template = Prompts.template_from_str(prompt)
+        chain = load_qa_with_sources_chain(
+            self.llm,
+            chain_type="stuff",
+            prompt=prompt_template,
+            verbose=verbose)      
+
+        answer = chain(
+            {"input_documents": sources, "question": query}, return_only_outputs=False
+        )
+
+        text = answer["output_text"].strip()
+
+        papers = []
+        i = 0
+        for doc in sources:
+            if not doc.metadata['name'] in papers:
+                papers.append(doc.metadata['name'])
+
+        return text, papers, sources
+
+    def search_docs(self, query: str, k:int = 100, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
         """Searches index for similar chunks to the query
         and returns a list of Documents."""
         # Search for similar chunks
         n=k
         # broad search then narrow down
         if min_length or meta_names or exclude_names:
-            k = self.collection.count()
+            k = self.size()
 
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=k
-        )
+        #TODO investigate
+        # results = self.collection.query(
+        #     query_texts=[query],
+        #     n_results=k
+        # )
+
+        chroma = self.get_langchain_chroma()
+        results = chroma.similarity_search(query, k=k//10)
+
         # assemble a list of documents from results
         ids = results['ids']
         metadatas = results['metadatas']
@@ -79,7 +152,6 @@ class Index:
             docs = [doc for doc in docs if len(doc.page_content) > min_length]
         return docs[:n]
 
-    @lru_cache()
     def get_file_names(self) -> List[str]:
         """Gets a list of file names."""
         docstore = self.collection.get()
@@ -88,33 +160,34 @@ class Index:
 
     def search_meta(self, query: str | List[str], how: str = "and") -> List[Document]:
         """Search based on the name of the document."""
-        names = self.get_doc_names()
+        names = self.get_file_names()
         # if query is a string perform a single search
         if isinstance(query, str):
-            matches = [name for name in names if Index.text_match(query, name, how=how)]
+            matches = [name for name in names if Util.text_match(query, name, how=how)]
         # if query is a list of strings perform multiple searches
         elif isinstance(query, list):
             matches = []
             for q in query:
-                matches += [name for name in names if Index.text_match(q, name, how=how)]
+                matches += [name for name in names if Util.text_match(q, name, how=how)]
         return matches
     
     def get_langchain_chroma(self) -> Chroma:
         return Chroma(client = self.client, collection_name=self.collection_name)
 
+class Util:
     @staticmethod
     def parse_file(file: str) -> List[str]:
         """Parses a file and returns a list of strings, one for each page."""
         _, ext = os.path.splitext(file)
         with open(file, "rb") as f:
-            if ext == ".pdf":
-                return Index.parse_pdf(f)
-            elif ext == ".docx":
-                return [Index.parse_docx(f)]
-            elif ext == ".txt":
-                return [Index.parse_txt(f)]
-            elif ext == ".html":
-                return [Index.parse_html(f)]
+            if ext.lower() == ".pdf":
+                return Util.parse_pdf(f)
+            elif ext.lower() == ".docx":
+                return [Util.parse_docx(f)]
+            elif ext.lower() == ".txt":
+                return [Util.parse_txt(f)]
+            elif ext.lower() == ".html":
+                return [Util.parse_html(f)]
             else:
                 raise ValueError(f"Unknown file extension: {ext}")
 
@@ -211,3 +284,25 @@ class Index:
             return reduce(lambda x, y: x or y, included, False)
         else:
             raise ValueError(f"Unknown how: {how}")
+        
+    @staticmethod
+    def seek_openai_token():
+        token = os.getenv("OPENAI_API_KEY")
+        if not token:
+            dotenv.load_dotenv()
+            token = os.getenv("OPENAI_API_KEY")
+        return token
+        
+class Prompts:
+    BASE_PROMPT = """Create /description/ final answer to the given questions using the provided sources.
+QUESTION: {question}
+=========
+SOURCES:
+
+{summaries}
+=========
+FINAL ANSWER:"""
+    @staticmethod
+    def template_from_str(template: str, input_variables: List[str] =["summaries", "question"]) -> PromptTemplate:
+        return PromptTemplate(
+            template=template, input_variables=input_variables)
