@@ -11,7 +11,7 @@ from pypdf import PdfReader
 from langchain.llms import OpenAI, BaseLLM
 from langchain.chat_models import ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-
+from chromadb.api.types import GetResult
 class Util:
     @staticmethod
     def parse_file(file: str) -> List[str]:
@@ -162,4 +162,15 @@ class Util:
             streaming=streaming, callbacks=[StreamingStdOutCallbackHandler()]
         )  
         return llm
+    
+    @staticmethod
+    def getresult2listdoc(results: GetResult) -> List[Document]:
+        """convert between chromadb and langchain format of results"""
+        ids = results['ids']
+        metadatas = results['metadatas']
+        texts = results['documents']
+        docs = [Document(
+                    page_content=texts[i], metadata=metadatas[i], id=ids[i]
+                ) for i in range(len(results['ids']))]
+        return docs 
     

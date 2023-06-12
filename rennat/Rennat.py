@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import warnings
 import os, sys, traceback
 from typing import List
 from index import Index
@@ -42,6 +43,7 @@ class Rennat:
         print("1. Ask a question")
         print("2. Converse with papers")
         print("3. Chat with a bot")
+        print("4. Summarize a paper")
         print("----- Admin -----")
         print("5. List files")
         print("6. List collections")
@@ -58,6 +60,8 @@ class Rennat:
             self.converse()
         elif choice == '3':
             self.chat()
+        elif choice == '4':
+            self.summarize()
         elif choice == '5':
             self.list_files()
         elif choice == '6':
@@ -168,6 +172,26 @@ class Rennat:
         print(answer)
         print()
     
+    def summarize(self):
+        meta_names = self.select_papers()
+        if not meta_names:
+            print("You have to select source papers")
+            return
+        while True:
+            query_modifier = self.read_query("enter a query [default is summarize]  (DONE to exit): ")
+            if not query_modifier:
+                break
+            query, _ = query_modifier
+            if not query:
+                query = "summarize"
+            sources = self.index.get_documents(meta_names)
+            print(f"summarizing this paper requires {len(sources)} different calls")
+            print("Do you want to continue? (y/n)")
+            decision = input()
+            if decision == 'y':   
+                text = self.index.refine(query, sources, False)
+                self.display_results(query, text, meta_names, sources)
+
     def inquire(self):
         while True:
             query_modifier = self.read_query()
@@ -202,20 +226,22 @@ class Rennat:
             self.display_results(query, answer, papers, sources)
 
     def current_collection(self, prompt="Current"):
-        print(prompt, "collection:", self.index.collection_name, "with", self.index.size(), "documents")
+        print(prompt, "collection:", self.index.collection_name, "with", len(self.index.get_file_names()), "files", self.index.size(), "documents")
 
 if __name__ == "__main__":
+    # turn off warnings
+    warnings.filterwarnings("ignore")
+    os.environ["TOKENIZERS_PARALLELISM"]="false"
     # check that two arguments are provided if not print usage
     if len(sys.argv) != 3:
         print("Usage: python rennat.py <index_file> <openai_token>")
-        sys.exit(1)
-
-    index_file = sys.argv[1]
-    openai_token = sys.argv[2]
-
-    # turn off warnings
-    import warnings
-    warnings.filterwarnings("ignore")
+        index_file = input("Enter the index file name: ").strip()
+        openai_token = Util.seek_openai_token().strip()
+        if not openai_token:
+            openai_token = input("Enter your OpenAI API Token: ")
+    else:
+        index_file = sys.argv[1]
+        openai_token = sys.argv[2]
 
     rennat = Rennat(index_file, "references", openai_token)
     print("Welcome to Rennat!")

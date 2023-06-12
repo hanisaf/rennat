@@ -85,6 +85,18 @@ class Index:
     def size(self):
         return self.collection.count()
 
+    def refine(self,query: str, sources: List[Document], verbose=False):
+        if not self.llm:
+            self.llm = Util.get_llm(self.openai_token)
+        if not sources:
+            sources = self.search_docs(query, k=10)
+        
+        chain = load_qa_with_sources_chain(self.llm, chain_type="refine", verbose=verbose)
+        answer = chain(
+            {"input_documents": sources, "question": query}, return_only_outputs=False
+        )
+        text = answer["output_text"].strip()
+        return text
 
     def answer(self, query: str, sources: List[Document] = None, modifier="", verbose=False):
         if not self.llm:
@@ -123,24 +135,7 @@ class Index:
     def search_docs(self, query: str, k:int = 1000, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
         """Searches index for similar chunks to the query
         and returns a list of Documents."""
-
-
-        k = min(k, self.size())
-
-        #TODO investigate why this is not working
-        # results = self.collection.query(
-        #     query_texts=[query],
-        #     n_results=k - 1
-        # )
-        # # assemble a list of documents from results
-        # ids = results['ids'][0] # only one query text
-        # metadatas = results['metadatas'][0] # only one query text
-        # texts = results['documents'][0] # only one query text
-        # docs = [Document(
-        #             page_content=texts[i], metadata=metadatas[i], id=ids[i]
-        #         ) for i in range(len(results))]
                 
-        chroma = self.get_langchain_chroma()
         # create a filter for the metadata
         # and change k in case of a filter given much fewer results
         if meta_names:
@@ -159,8 +154,23 @@ class Index:
         if filter:
             relevant_docs = self.collection.get(where=filter)
             k = len(relevant_docs['ids'])
-        docs = chroma.similarity_search(query, k=k, filter=filter)
+        else:
+            k = min(k, self.size())
 
+        # chroma = self.get_langchain_chroma()
+        # docs = chroma.similarity_search(query, k=k, filter=filter)
+
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=k
+        )
+        # assemble a list of documents from results
+        ids = results['ids'][0] # only one query text
+        metadatas = results['metadatas'][0] # only one query text
+        texts = results['documents'][0] # only one query text
+        docs = [Document(
+                    page_content=texts[i], metadata=metadatas[i], id=ids[i]
+                ) for i in range(len(ids))]
 
         # filter out documents that don't meet the criteria        
         # if meta_names:
@@ -177,6 +187,14 @@ class Index:
         existing_docs = {d['name'] for d in docstore['metadatas']}
         return existing_docs
 
+    def get_documents(self, file_names: List[str]) -> List[Document]:
+        docstore = self.collection.get()
+        docs = Util.getresult2listdoc(docstore)
+        if file_names:
+            docs = [doc for doc in docs if doc.metadata['name'] in file_names]
+        #TODO sort?
+        return docs
+    
     def search_meta(self, query: str | List[str], how: str = "and") -> List[Document]:
         """Search based on the name of the document."""
         names = self.get_file_names()
