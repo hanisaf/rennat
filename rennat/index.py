@@ -18,7 +18,9 @@ from langchain.chat_models import ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from util import Util
+
 class Index:
+    
     def __init__(self, index_file: str = None, collection_name: str = "references", openai_token:str = None) -> None:
         self.client = chromadb.Client(Settings(
             chroma_db_impl="duckdb+parquet",
@@ -36,6 +38,17 @@ class Index:
         self.collection_name = collection_name
         self.collection = self.client.get_or_create_collection(name=collection_name)
 
+    def delete_collection(self, collection_name) -> None:
+        if collection_name == "references":
+            print("Cannot delete references collection.")
+            return
+        else:
+            self.switch_collection("references")
+            self.client.delete_collection(collection_name)
+
+    def list_collections(self) -> List[str]:
+        return self.client.list_collections()
+    
     def add_documents(self, docs: List[Document]) -> None:
         documents = [doc.page_content for doc in docs]
         metadatas = [doc.metadata for doc in docs]
@@ -52,16 +65,22 @@ class Index:
         docs = []
         for f in tqdm(files):
             try:
-                text = Util.parse_file(f)
                 fn = os.path.basename(f)
+                text = Util.parse_file(f)
                 if verbose:
                     print("Processing ", fn, "...")
                 doc = Util.text_to_docs(text, fn)
-                docs.extend(doc)
+                #docs.extend(doc)
+                if doc:
+                    self.add_documents(doc)
             except Exception as e:
                 print("Error processing ", fn, ": ", e)
-        if docs: # not empty
-            self.add_documents(docs)
+        # if docs: # not empty
+        #     self.add_documents(docs)
+
+    def delete_files(self, files: List[str]) -> None:
+        for f in tqdm(files):
+            self.collection.delete(where={"name": {"$eq": f}})
 
     def size(self):
         return self.collection.count()
@@ -144,8 +163,8 @@ class Index:
 
 
         # filter out documents that don't meet the criteria        
-        if meta_names:
-            docs = [doc for doc in docs if doc.metadata['name'] in meta_names]
+        # if meta_names:
+        #     docs = [doc for doc in docs if doc.metadata['name'] in meta_names]
         if exclude_names:
             docs = [doc for doc in docs if doc.metadata['name'] not in exclude_names]
         if min_length:
