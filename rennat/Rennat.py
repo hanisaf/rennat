@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 import os, sys
 from typing import List
-from Index import Index, Util
+from index import Index
+from util import Util
 from chatbot import ChatBot
 
 class Rennat:
@@ -13,6 +14,7 @@ class Rennat:
         self.last_papers = None
         self.last_query = None
         self.chatbot = None
+        self.n = 25
 
     def chat(self):
         if not self.chatbot:
@@ -36,89 +38,101 @@ class Rennat:
 
 
     def mainmenu(self):
+        print("0. Exit")
         print("1. Ask a question")
         print("2. Chat with a bot")
-        print("3. Exit")
         choice = input("Please enter your choice: ")
         if choice == '1':
             self.inquire()
         elif choice == '2':
             self.chat()
-        elif choice == '3':
+        elif choice == '0' or choice == 'DONE':
             sys.exit(0)
 
-    def inquire(self, n=25):
-        query = input("Please enter your query: ")
-        meta = input("Please enter meta data criteria, enter to skip: ")
-        if meta:
-            meta = meta.split(',')
-
-        modifier = ""
-        if query.startswith('%'):
-            modifier = query.partition(' ')[0][1:].replace("_", " ")
-            query = query.partition(' ')[-1].strip()
-
-        meta_names = None
-        if meta:
-            meta_names = self.index.search_meta(meta)
-            print("Based on the meta data, the following documents are found:")
-            i = 0
-            for m in meta_names:
-                print(i, '-', m)
-                i += 1
-        print()
-
-        docs =  self.index.search_docs(query, meta_names=meta_names)
-        # obtain a unique list of documents name from metadata
-        doc_names = []
-        for doc in docs:
-            name = doc.metadata['name']
-            if not name in doc_names:
-                doc_names.append(name)
-        doc_names = doc_names[:n]
-        print("Based on the query,", "and meta criteria" if meta_names else "","the following documents are found:")
+    def select_from_a_list(self, items:List[str], 
+                           prompt1:str = "Based on the meta data, the following documents are found:",
+                           prompt2:str = "Select the paper you want to use, enter to select all: "):
+        print(prompt1)
         i = 0
-        for d in doc_names:
-            print(i, '-', d)
+        for m in items:
+            print(i, '-', m)
             i += 1
-
-        print()
-        print("Select the documents you want to use, enter to select all: ")
+        print()        
+        print(prompt2)
         selected = input()
         if selected:
             selected = selected.split(',')
             selected = [int(s) for s in selected]
-            doc_names = [doc_names[i] for i in selected]
+            items = [items[i] for i in selected]
+        return items
+
+    def select_papers(self, prompt="Please enter paper keyword, or hit enter to skip: "):
+        meta = input(prompt)
+        if not meta:
+            return
+        meta = meta.split(',')
+        meta_names = self.index.search_meta(meta)   
+        doc_names = self.select_from_a_list(meta_names)
+        return doc_names
+    
+    def converse(self):
+        pass
+
+    def inquire(self):
+        meta_names = self.select_papers()
+        while True:
+            query = input("Please enter your query (DONE to exit): ")
+            if query.strip() == "DONE":
+                return
+                
+            modifier = ""
+            if query.startswith('%'):
+                modifier = query.partition(' ')[0][1:].replace("_", " ")
+                query = query.partition(' ')[-1].strip()
+
+            docs =  self.index.search_docs(query, meta_names=meta_names)
+            # obtain a unique list of documents name from metadata
+            doc_names = []
+            for doc in docs:
+                name = doc.metadata['name']
+                if not name in doc_names:
+                    doc_names.append(name)
+            doc_names = doc_names[:self.n]
+
+            prompt1 = "Based on the query," + "and meta criteria" if meta_names else "" + "the following papers are found:"
+            doc_names = self.select_from_a_list(doc_names, prompt1=prompt1)
+
             docs = [doc for doc in docs if doc.metadata['name'] in doc_names]
-        
-        answer, papers, sources = self.index.answer(query, docs, modifier=modifier)
-        self.last_query = query
-        self.last_answer = answer
-        self.last_sources = sources
-        self.last_papers = papers
+            
+            answer, papers, sources = self.index.answer(query, docs, modifier=modifier)
+            self.last_query = query
+            self.last_answer = answer
+            self.last_sources = sources
+            self.last_papers = papers
 
-        print()
-        print("\nSELECTED QUOTES:")
-        for doc in sources:
-            print('-', doc.metadata['source'], doc.page_content)  
             print()
+            print("\nSELECTED QUOTES:")
+            for doc in sources:
+                print('-', doc.metadata['source'], doc.page_content)  
+                print()
 
-        print("\nSELECTED SOURCES:")
-        i = 0
-        for paper in papers:
-            print(i, '-', paper)
-            i += 1
+            print("\nSELECTED SOURCES:")
+            i = 0
+            for paper in papers:
+                print(i, '-', paper)
+                i += 1
 
-        print("\n\nFINAL ANSWER")
-        print(answer)
+            print("\n\nFINAL ANSWER")
+            print(answer)
+            print()
 
 if __name__ == "__main__":
     rennat = Rennat(os.getenv("RENNAT"), "references", os.getenv("OPENAI_API_KEY"))
     print("Welcome to Rennat!")
     while(True):
-        try:
-            rennat.mainmenu()
-            print()
-        except Exception as e:  
-            print("Error:", e)
+        # try:
+        rennat.mainmenu()
+        print()
+        # except Exception as e:  
+        #     print("Error:", e)
 

@@ -10,14 +10,14 @@ from langchain.schema import (
     SystemMessage
 )
 
-from utils import get_llm
+from util import Util
 
 
 class ChatBot:
 
-    def __init__(self, name):
+    def __init__(self, name, openai_token=None):
         self.name = name
-        self.llm = get_llm()
+        self.llm = Util.get_llm(openai_token)
         self.messages = [HumanMessage(content=f"You are {name}")]
 
     def inform(self, message:str):
