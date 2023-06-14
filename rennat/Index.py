@@ -45,6 +45,7 @@ class Index:
         else:
             self.switch_collection("references")
             self.client.delete_collection(collection_name)
+            self.client.persist()
 
     def list_collections(self) -> List[str]:
         return self.client.list_collections()
@@ -62,7 +63,6 @@ class Index:
             ignored_files = [f for f in files if os.path.basename(f) in existing_files]
             print("Ignoring ", len(ignored_files), " existing files.")            
             files = [f for f in files if os.path.basename(f) not in existing_files]
-        docs = []
         for f in tqdm(files):
             try:
                 fn = os.path.basename(f)
@@ -70,17 +70,27 @@ class Index:
                 if verbose:
                     print("Processing ", fn, "...")
                 doc = Util.text_to_docs(text, fn)
-                #docs.extend(doc)
                 if doc:
                     self.add_documents(doc)
             except Exception as e:
                 print("Error processing ", fn, ": ", e)
-        # if docs: # not empty
-        #     self.add_documents(docs)
+        self.client.persist()
 
     def delete_files(self, files: List[str]) -> None:
-        for f in tqdm(files):
-            self.collection.delete(where={"name": {"$eq": f}})
+        # # this is generating an error when the file name has special characters
+        # # it seems it depends on sql injection        
+        # for f in tqdm(files):
+        #     self.collection.delete(where={"name": {"$eq": f}})
+        
+        # this is a workaround but it's memory intensive
+        results = self.collection.get()
+        ids = results['ids']
+        metadatas = results['metadatas']
+        deleted_ids = [ id for id in ids if metadatas[ids.index(id)]['name'] in files ]
+        self.collection.delete(ids=deleted_ids)
+        self.client.persist()
+        print("deleted ", len(files), " files with", len(deleted_ids), " chunks.")
+
 
     def size(self):
         return self.collection.count()
@@ -109,7 +119,7 @@ class Index:
         prompt_words = len(re.split("\W", prompt))
         remaining_tokens = 4096 - prompt_words * 2
         i = Util.max_sources(sources, remaining_tokens)
-        sources = sources[:i] # -2 to provide some fodder for chat
+        sources = sources[:i] 
 
         prompt_template = Prompts.template_from_str(prompt)
         chain = load_qa_with_sources_chain(
@@ -132,7 +142,7 @@ class Index:
 
         return text, papers, sources
 
-    def search_docs(self, query: str, k:int = 1000, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=0) -> List[Document]:
+    def search_docs(self, query: str, k:int = 1000, meta_names : List[str] = None, exclude_names : List[str] = None, min_length=100) -> List[Document]:
         """Searches index for similar chunks to the query
         and returns a list of Documents."""
                 
@@ -157,11 +167,9 @@ class Index:
         else:
             k = min(k, self.size())
 
-        # chroma = self.get_langchain_chroma()
-        # docs = chroma.similarity_search(query, k=k, filter=filter)
-
         results = self.collection.query(
             query_texts=[query],
+            where=filter,
             n_results=k
         )
         # assemble a list of documents from results
@@ -213,7 +221,7 @@ class Index:
 
 
 class Prompts:
-    BASE_PROMPT = """Create /description/ final answer to the given questions using the provided sources.
+    BASE_PROMPT = """Create /description/ final answer to the given question using the provided sources.
 QUESTION: {question}
 =========
 SOURCES:

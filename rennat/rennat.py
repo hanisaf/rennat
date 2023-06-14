@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from glob import glob
 import warnings
 import os, sys, traceback
 from typing import List
@@ -31,11 +32,14 @@ class Rennat:
             for doc in self.last_sources[:i]:
                 self.chatbot.inform(f"\n - Source: {doc.metadata['source']}\nContent: {doc.page_content}")
         while True:
-            message = input("\nYou (DONE to exit): ")
+            message = input("\nYou (RESET to reset, DONE to exit): ")
             if message == "DONE":
                 break
-            response = self.chatbot.chat(message)
-            # print(f"\n{self.chatbot.name}: {response}") # no need to print when streaming
+            elif message == "RESET":
+                self.chatbot.reset()
+            else:
+                response = self.chatbot.chat(message)
+                # print(f"\n{self.chatbot.name}: {response}") # no need to print when streaming
 
 
     def mainmenu(self):
@@ -98,7 +102,12 @@ class Rennat:
     def add_files(self):
         files = input("Please enter files to add (comma separated): ")
         files = files.split(',')
-        self.index.add_files(files, verbose=True)
+        res = []
+        for f in files:
+            f = glob(f)
+            if f:
+                res.extend(f)
+        self.index.add_files(res, verbose=True)
 
     def delete_files(self):
         files = input("Please enter files to delete (comma separated): ")
@@ -146,11 +155,6 @@ class Rennat:
         selected = self.number_select()
         if selected:
             items = [items[i] for i in selected]
-        # selected = input()
-        # if selected:
-        #     selected = selected.split(',')
-        #     selected = [int(s) for s in selected]
-        # items = [items[i] for i in selected]
         return items
 
     def select_papers(self, prompt="Please enter paper keyword, or hit enter to skip: "):
