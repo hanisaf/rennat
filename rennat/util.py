@@ -148,8 +148,8 @@ class Util:
     def max_sources(docs: List[Document], max_tokens = 4096) -> int:
         for i in range(len(docs)):
             if Util.estimated_tokens(docs[:i]) > max_tokens:
-                break
-        return i - 1
+                return i - 1
+        return len(docs)
 
     @staticmethod
     def get_llm(openai_token: str, temperature:float=0.0, model_name= "gpt-3.5-turbo", streaming=True) -> BaseLLM:

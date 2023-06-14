@@ -109,7 +109,7 @@ class Index:
         prompt_words = len(re.split("\W", prompt))
         remaining_tokens = 4096 - prompt_words * 2
         i = Util.max_sources(sources, remaining_tokens)
-        sources = sources[:i] # -2 to provide some fodder for chat
+        sources = sources[:i] 
 
         prompt_template = Prompts.template_from_str(prompt)
         chain = load_qa_with_sources_chain(
@@ -162,6 +162,7 @@ class Index:
 
         results = self.collection.query(
             query_texts=[query],
+            where=filter,
             n_results=k
         )
         # assemble a list of documents from results

@@ -114,6 +114,25 @@ class Rennat:
             collection_name = input("Please enter collection name: ")
             self.index.delete_collection(collection_name)
 
+    def number_select(self) -> List[int]:
+        "allows the user to input multiple numbers separated by commas, it accepts ranges with dashes as well"
+        selected = input()
+        if selected:
+            selected = selected.split(',')
+            #process ranges start-end
+            res = []
+            for e in selected:
+                if '-' in e:
+                    start, end = e.split('-')
+                    start = int(start)
+                    end = int(end)
+                    res.extend(range(start, end+1))
+                else:
+                    res.append(int(e))
+            return res
+        else:
+            return []
+    
     def select_from_a_list(self, items:List[str], 
                            prompt1:str = "Based on the meta data, the following documents are found:",
                            prompt2:str = "Select the paper you want to use, enter to select all: "):
@@ -124,11 +143,14 @@ class Rennat:
             i += 1
         print()        
         print(prompt2)
-        selected = input()
+        selected = self.number_select()
         if selected:
-            selected = selected.split(',')
-            selected = [int(s) for s in selected]
             items = [items[i] for i in selected]
+        # selected = input()
+        # if selected:
+        #     selected = selected.split(',')
+        #     selected = [int(s) for s in selected]
+        # items = [items[i] for i in selected]
         return items
 
     def select_papers(self, prompt="Please enter paper keyword, or hit enter to skip: "):
@@ -157,12 +179,14 @@ class Rennat:
         self.last_papers = papers
 
         print()
-        print("\nSELECTED QUOTES:")
+        print("\nSELECTED SOURCES:")
+        i = 0
         for doc in sources:
-            print('-', doc.metadata['source'], doc.page_content)  
+            print(i, '-', doc.metadata['source'], doc.page_content)  
+            i += 1
             print()
 
-        print("\nSELECTED SOURCES:")
+        print("\nSELECTED PAPERS:")
         i = 0
         for paper in papers:
             print(i, '-', paper)
@@ -185,12 +209,13 @@ class Rennat:
             if not query:
                 query = "summarize"
             sources = self.index.get_documents(meta_names)
-            print(f"summarizing this paper requires {len(sources)} different calls")
-            print("Do you want to continue? (y/n)")
-            decision = input()
-            if decision == 'y':   
-                text = self.index.refine(query, sources, False)
-                self.display_results(query, text, meta_names, sources)
+            print(f"summarizing this paper requires processing {len(sources)} sources")
+            print("You can select a subset or press enter to continue with all")
+            selected = self.number_select()
+            if selected:
+                sources = [sources[i] for i in selected]
+            text = self.index.refine(query, sources, False)
+            self.display_results(query, text, meta_names, sources)
 
     def inquire(self):
         while True:
@@ -198,8 +223,18 @@ class Rennat:
             if not query_modifier:
                 break
             query, modifier = query_modifier
-            answer, papers, sources = self.index.answer(query, modifier=modifier)
-            self.display_results(query, answer, papers, sources)
+            docs = None
+            while True:
+                answer, papers, sources = self.index.answer(query, docs, modifier=modifier)
+                self.display_results(query, answer, papers, sources)
+                decision = input("do you want to re-answer the question using a subset of the sources? (y/n) ")
+                if decision == 'y':
+                    print("You can select a subset or press enter to continue with all")
+                    selected = self.number_select()
+                    if selected:
+                        docs = [sources[i] for i in selected]
+                else:
+                    break
 
     def converse(self):
         meta_names = self.select_papers()
@@ -217,13 +252,23 @@ class Rennat:
                     doc_names.append(name)
             doc_names = doc_names[:self.n]
 
-            prompt1 = "Based on the query," + "and meta criteria" if meta_names else "" + "the following papers are found:"
+            prompt1 = "Based on the query," + "and paper criteria" if meta_names else "" + "the following papers are found:"
             doc_names = self.select_from_a_list(doc_names, prompt1=prompt1)
 
             docs = [doc for doc in docs if doc.metadata['name'] in doc_names]
             
-            answer, papers, sources = self.index.answer(query, docs, modifier=modifier)
-            self.display_results(query, answer, papers, sources)
+            while True:
+                answer, papers, sources = self.index.answer(query, docs, modifier=modifier)
+                self.display_results(query, answer, papers, sources)
+
+                decision = input("do you want to re-answer the question using a subset of the sources? (y/n) ")
+                if decision == 'y':
+                    print("You can select a subset or press enter to continue with all")
+                    selected = self.number_select()
+                    if selected:
+                        docs = [sources[i] for i in selected]
+                else:
+                    break
 
     def current_collection(self, prompt="Current"):
         print(prompt, "collection:", self.index.collection_name, "with", len(self.index.get_file_names()), "files", self.index.size(), "documents")
