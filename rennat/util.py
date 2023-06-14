@@ -48,7 +48,7 @@ class Util:
 
     @staticmethod
     def parse_pdf(file: BytesIO) -> List[str]:
-        pdf = PdfReader(file)
+        pdf = PdfReader(file, strict = False)
         output = []
         for page in pdf.pages:
             text = page.extract_text()

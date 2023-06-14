@@ -81,12 +81,12 @@ class Index:
         # # it seems it depends on sql injection        
         # for f in tqdm(files):
         #     self.collection.delete(where={"name": {"$eq": f}})
-        
+        # print("deleted ", len(files), " files")
         # this is a workaround but it's memory intensive
         results = self.collection.get()
         ids = results['ids']
         metadatas = results['metadatas']
-        deleted_ids = [ id for id in ids if metadatas[ids.index(id)]['name'] in files ]
+        deleted_ids = [ ids[i] for i in range(len(ids)) if metadatas[i]['name'] in files ]
         self.collection.delete(ids=deleted_ids)
         self.client.persist()
         print("deleted ", len(files), " files with", len(deleted_ids), " chunks.")
