@@ -279,7 +279,7 @@ class Rennat:
 
 if __name__ == "__main__":
     # turn off warnings
-    warnings.filterwarnings("ignore")
+    # warnings.filterwarnings("ignore")
     os.environ["TOKENIZERS_PARALLELISM"]="false"
     # check that two arguments are provided if not print usage
     if len(sys.argv) != 3:

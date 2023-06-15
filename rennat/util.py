@@ -1,36 +1,42 @@
-from functools import reduce
+from functools import lru_cache, reduce
 from io import BytesIO
 from typing import List, Optional
 from bs4 import BeautifulSoup
 import os, dotenv, re
-from langchain import PromptTemplate
+from langchain import LLMChain, PromptTemplate
+from langchain.llms import GPT4All
+from langchain.llms import LlamaCpp
+from langchain import HuggingFaceHub
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import docx2txt
 from pypdf import PdfReader
+#from PyPDF4 import PdfFileReader
 from langchain.llms import OpenAI, BaseLLM
 from langchain.chat_models import ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from chromadb.api.types import GetResult
 class Util:
+    MAX_PROMPT_TOKENS = 4096
+
     @staticmethod
-    def parse_file(file: str) -> List[str]:
+    def parse_file(file_name: str) -> List[str]:
         """Parses a file and returns a list of strings, one for each page."""
-        _, ext = os.path.splitext(file)
-        with open(file, "rb") as f:
+        _, ext = os.path.splitext(file_name)
+        with open(file_name, "rb") as file_content:
             if ext.lower() == ".pdf":
-                return Util.parse_pdf(f)
+                return Util.parse_pdf(file_content, file_name)
             elif ext.lower() == ".docx":
-                return [Util.parse_docx(f)]
+                return [Util.parse_docx(file_content, file_name)]
             elif ext.lower() == ".txt":
-                return [Util.parse_txt(f)]
+                return [Util.parse_txt(file_content, file_name)]
             elif ext.lower() == ".html":
-                return [Util.parse_html(f)]
+                return [Util.parse_html(file_content, file_name)]
             else:
                 raise ValueError(f"Unknown file extension: {ext}")
 
     @staticmethod
-    def parse_html(file: BytesIO) -> str:
+    def parse_html(file: BytesIO, name: str = None) -> str:
         # using BeautifulSoup to parse the HTML
         soup = BeautifulSoup(file, 'html.parser')
         # get the text out of the soup
@@ -40,14 +46,14 @@ class Util:
         return text
 
     @staticmethod
-    def parse_docx(file: BytesIO) -> str:
+    def parse_docx(file: BytesIO, name: str = None) -> str:
         text = docx2txt.process(file)
         # Remove multiple newlines
         text = re.sub(r"\n\s*\n", "\n\n", text)
         return text
 
     @staticmethod
-    def parse_pdf(file: BytesIO) -> List[str]:
+    def parse_pdf(file: BytesIO, name: str = None) -> List[str]:
         pdf = PdfReader(file, strict = False)
         output = []
         for page in pdf.pages:
@@ -63,8 +69,9 @@ class Util:
 
         return output
 
+
     @staticmethod
-    def parse_txt(file: BytesIO) -> str:
+    def parse_txt(file: BytesIO, name: str = None) -> str:
         text = file.read().decode("utf-8")
         # Remove multiple newlines
         text = re.sub(r"\n\s*\n", "\n\n", text)
@@ -145,22 +152,35 @@ class Util:
         return Util.total_words(docs) * 2
     
     @staticmethod
-    def max_sources(docs: List[Document], max_tokens = 4096) -> int:
+    def max_sources(docs: List[Document], max_tokens = MAX_PROMPT_TOKENS) -> int:
         for i in range(len(docs)):
             if Util.estimated_tokens(docs[:i]) > max_tokens:
                 return i - 1
         return len(docs)
 
-    @staticmethod
-    def get_llm(openai_token: str, temperature:float=0.0, model_name= "gpt-3.5-turbo", streaming=True) -> BaseLLM:
+    @staticmethod 
+    @lru_cache(maxsize=32)
+    def get_llm(model_token_or_path: str, model_name= "gpt-3.5-turbo", temperature:float=0.0, streaming=True) -> BaseLLM:
         """Gets an OpenAI LLM model."""
-        if not openai_token:
-            openai_token = Util.seek_openai_token()
-        model = ChatOpenAI if model_name == "gpt-3.5-turbo" else OpenAI
-        llm = model(
-            temperature=temperature, openai_api_key=openai_token, model_name=model_name,
-            streaming=streaming, callbacks=[StreamingStdOutCallbackHandler()]
-        )  
+        if not model_token_or_path:
+            model_token_or_path = Util.seek_openai_token()
+        
+        callbacks=[StreamingStdOutCallbackHandler()]
+        if model_name == "gpt-3.5-turbo":
+            llm = ChatOpenAI(
+                temperature=temperature, openai_api_key=model_token_or_path, model_name=model_name,
+                streaming=streaming, callbacks=callbacks
+            )
+        elif model_name == "text-davinci-003":
+            llm = OpenAI(
+                temperature=temperature, openai_api_key=model_token_or_path, model_name=model_name,
+                streaming=streaming, callbacks=callbacks
+            )
+        elif model_name == "huggingface":      
+            repo_id = "Writer/camel-5b-hf" # See https://huggingface.co/Writer for other options
+            llm = HuggingFaceHub(repo_id=repo_id, model_kwargs={"temperature":0, "max_length":64}, huggingfacehub_api_token=model_token_or_path)
+        elif model_name == "gpt4all":
+            llm = LlamaCpp(model_path=model_token_or_path, callbacks=callbacks, verbose=True)   
         return llm
     
     @staticmethod
@@ -174,3 +194,20 @@ class Util:
                 ) for i in range(len(results['ids']))]
         return docs 
     
+
+if __name__ == "__main__":
+    # testing code
+    model_name = input("Enter model name: ")
+    model_token = input("Enter model token: ")
+    llm = Util.get_llm(model_token_or_path=model_token, model_name=model_name)
+
+    template = """Question: {question}
+
+    Answer: Let's think step by step."""
+    prompt = PromptTemplate(template=template, input_variables=["question"])
+    llm_chain = LLMChain(prompt=prompt, llm=llm)
+
+    question = "Who won the FIFA World Cup in the year 1994? "
+
+    print(llm_chain.run(question))    
+    pass

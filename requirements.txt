@@ -4,11 +4,12 @@ faiss-cpu>=1.7.3
 openai>=0.26.2
 docx2txt>=0.8
 pillow>=9.4.0
-pypdf>=3.3.0
+pypdf
 tenacity>=8.2.0
 path>=16.6.0
 tiktoken>=0.4.0
 transformers>=4.30
 python-dotenv>=0.21.1
+pycryptodome
 bs4
 

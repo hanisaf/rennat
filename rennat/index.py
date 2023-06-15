@@ -33,6 +33,9 @@ class Index:
         else:
             self.openai_token = openai_token
         self.llm = None
+        
+        # testing with a local model
+        #self.llm = Util.get_llm(f"{os.path.expanduser('~')}/Library/Application Support/nomic.ai/GPT4All/ggml-stable-vicuna-13B.q4_2.bin", "gpt4all")
 
     def switch_collection(self, collection_name: str) -> None:
         self.collection_name = collection_name
@@ -86,7 +89,7 @@ class Index:
         results = self.collection.get()
         ids = results['ids']
         metadatas = results['metadatas']
-        deleted_ids = [ ids[i] for i in range(len(ids)) if metadatas[i]['name'] in files ]
+        deleted_ids = [ ids[i] for i in tqdm(range(len(ids))) if metadatas[i]['name'] in files ]
         self.collection.delete(ids=deleted_ids)
         self.client.persist()
         print("deleted ", len(files), " files with", len(deleted_ids), " chunks.")
@@ -117,7 +120,7 @@ class Index:
         description = "a" if not modifier else "an " + modifier if modifier[0] in "aeiou" else "a " + modifier
         prompt = Prompts.BASE_PROMPT.replace("/description/", description)
         prompt_words = len(re.split("\W", prompt))
-        remaining_tokens = 4096 - prompt_words * 2
+        remaining_tokens = Util.MAX_PROMPT_TOKENS - prompt_words * 2
         i = Util.max_sources(sources, remaining_tokens)
         sources = sources[:i] 
 
@@ -233,3 +236,4 @@ FINAL ANSWER:"""
     def template_from_str(template: str, input_variables: List[str] =["summaries", "question"]) -> PromptTemplate:
         return PromptTemplate(
             template=template, input_variables=input_variables)
+    
