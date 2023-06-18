@@ -18,6 +18,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from util import Util
+from langchain.chains.summarize import load_summarize_chain
 
 class Index:
     
@@ -98,6 +99,35 @@ class Index:
     def size(self):
         return self.collection.count()
 
+    def synthesize(self,query: str, sources: List[Document], verbose=False):
+        if not self.llm:
+            self.llm = Util.get_llm(self.openai_token)
+        if not sources:
+            sources = self.search_docs(query, k=5)
+        
+
+        for source in sources:
+            citation = Util.gen_citation(source)
+            source.page_content = f"Source citation: {citation}: " + source.page_content
+
+
+        map_prompt = PromptTemplate(template=Prompts.SUMMARY_PROMPT, input_variables=["text"])
+        combine_prompt = PromptTemplate(template=Prompts.COMBINE_PROMPT, input_variables=["text"])
+
+
+
+        chain = load_summarize_chain(self.llm, chain_type="map_reduce", map_prompt=map_prompt, combine_prompt=combine_prompt, verbose=verbose)
+        answer = chain(
+            {"input_documents": sources}, return_only_outputs=False
+        )
+        text = answer["output_text"].strip()
+        papers = []
+        i = 0
+        for doc in sources:
+            if not doc.metadata['name'] in papers:
+                papers.append(doc.metadata['name'])        
+        return text, papers, sources        
+
     def refine(self,query: str, sources: List[Document], verbose=False):
         if not self.llm:
             self.llm = Util.get_llm(self.openai_token)
@@ -124,7 +154,8 @@ class Index:
         i = Util.max_sources(sources, remaining_tokens)
         sources = sources[:i] 
 
-        prompt_template = Prompts.template_from_str(prompt)
+        prompt_template = PromptTemplate(template=prompt, input_variables=["summaries", "question"])
+
         chain = load_qa_with_sources_chain(
             self.llm,
             chain_type="stuff",
@@ -232,8 +263,21 @@ SOURCES:
 {summaries}
 =========
 FINAL ANSWER:"""
-    @staticmethod
-    def template_from_str(template: str, input_variables: List[str] =["summaries", "question"]) -> PromptTemplate:
-        return PromptTemplate(
-            template=template, input_variables=input_variables)
-    
+
+    SUMMARY_PROMPT = """Write a concise summary of the following and put the source citation at the end:
+
+
+"{text}"
+
+CONCISE SUMMARY:
+"""
+
+    COMBINE_PROMPT = """Write a concise summary of the following and include all source citations verbatim:
+
+
+"{text}"
+
+CONCISE SUMMARY:
+"""
+
+"Source citation: (Stendal, Thapa, Lanamaki, p. 8):Given actors, have  the capabilities to perform the action. Likewise, we  found another point of confusion in the identification,  for example how and who identify the affordances, likewise when do the affordances identified.   The question of affordances as possibility of  action or affordance as performed action remains  unclear. The literatures reported in this paper have  reported list of affordan ces, but also insisted on  understanding the actualization and consequences of  identified affordances.   Finally, we agree that affordance is a useful lens  to understand the sociotechnical mechanism in  Information System context, though it needs critical  construction to progress towards maturity."

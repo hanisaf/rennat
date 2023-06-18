@@ -194,7 +194,13 @@ class Util:
                 ) for i in range(len(results['ids']))]
         return docs 
     
-
+    @staticmethod
+    def gen_citation(doc: Document) -> str:
+        author = doc.metadata['name'].split(' - ')[0]
+        page = doc.metadata['page']
+        citation = f"({author}, p. {page})"
+        return citation
+    
 if __name__ == "__main__":
     # testing code
     model_name = input("Enter model name: ")

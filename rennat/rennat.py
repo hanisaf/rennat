@@ -48,13 +48,15 @@ class Rennat:
         print("2. Converse with papers")
         print("3. Chat with a bot")
         print("4. Summarize a paper")
+        print("----- Advanced -----")
+        print("5. Synthesize literature")
         print("----- Admin -----")
-        print("5. List files")
-        print("6. List collections")
-        print("7. Select/create collection")
-        print("8. Add files to collection")
-        print("9. Delete files from collection")
-        print("0. Delete collection")
+        print("a. List files")
+        print("b. List collections")
+        print("c. Select/create collection")
+        print("d. Add files to collection")
+        print("e. Delete files from collection")
+        print("f. Delete collection")
 
         print("DONE Exit")
         choice = input("Please enter your choice: ")
@@ -67,16 +69,18 @@ class Rennat:
         elif choice == '4':
             self.summarize()
         elif choice == '5':
+            self.synthesize()
+        elif choice == 'a':
             self.list_files()
-        elif choice == '6':
+        elif choice == 'b':
             self.list_collections()
-        elif choice == '7':
+        elif choice == 'c':
             self.select_collection()
-        elif choice == '8':
+        elif choice == 'd':
             self.add_files()
-        elif choice == '9':
+        elif choice == 'e':
             self.delete_files()
-        elif choice == '0':
+        elif choice == 'f':
             self.delete_collection()
         elif choice == 'DONE':
             sys.exit(0)
@@ -168,6 +172,8 @@ class Rennat:
 
     def read_query(self, prompt="Please enter your query (DONE to exit): "):
         query = input(prompt)
+        if not query:
+            return None
         if query.strip() == "DONE":
             return
         modifier = ""
@@ -220,6 +226,25 @@ class Rennat:
                 sources = [sources[i] for i in selected]
             text = self.index.refine(query, sources, False)
             self.display_results(query, text, meta_names, sources)
+
+    def synthesize(self):
+        while True:
+            query_modifier = self.read_query()
+            if not query_modifier:
+                break
+            query, modifier = query_modifier
+            docs = None
+            while True:
+                answer, papers, sources = self.index.synthesize(query, docs)
+                self.display_results(query, answer, papers, sources)
+                decision = input("do you want to re-answer the question using a subset of the sources? (y/n) ")
+                if decision == 'y':
+                    print("You can select a subset or press enter to continue with all")
+                    selected = self.number_select()
+                    if selected:
+                        docs = [sources[i] for i in selected]
+                else:
+                    break
 
     def inquire(self):
         while True:
