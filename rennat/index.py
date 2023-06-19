@@ -135,6 +135,7 @@ class Index:
             sources = self.search_docs(query, k=10)
         
         chain = load_qa_with_sources_chain(self.llm, chain_type="refine", verbose=verbose)
+        #TODO: Original answer remains unchanged. Need to fix this.
         answer = chain(
             {"input_documents": sources, "question": query}, return_only_outputs=False
         )
