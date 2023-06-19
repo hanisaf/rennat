@@ -212,18 +212,27 @@ class Rennat:
             print("You have to select source papers")
             return
         while True:
-            query_modifier = self.read_query("enter a query [default is summarize]  (DONE to exit): ")
+            query_modifier = self.read_query("enter a query (e.g., summarize)  (DONE to exit): ")
             if not query_modifier:
                 break
             query, _ = query_modifier
-            if not query:
-                query = "summarize"
             sources = self.index.get_documents(meta_names)
-            print(f"summarizing this paper requires processing {len(sources)} sources")
-            print("You can select a subset or press enter to continue with all")
-            selected = self.number_select()
-            if selected:
-                sources = [sources[i] for i in selected]
+            if len(meta_names) == 1:
+                # select pages
+                pages = {source.metadata['page'] for source in sources}
+                min_page = min(pages)
+                max_page = max(pages)
+                print(f"The selected paper has {len(pages)} pages, from {min_page} to {max_page}")
+                print("You can select a subset or press enter to continue with all")
+                selected = self.number_select()
+                if selected:
+                    sources = [source for source in sources if source.metadata['page'] in selected]
+            else:
+                print(f"summarizing these papers requires processing {len(sources)} sources")
+                print("You can select a subset or press enter to continue with all")
+                selected = self.number_select()
+                if selected:
+                    sources = [sources[i] for i in selected]
             text = self.index.refine(query, sources, False)
             self.display_results(query, text, meta_names, sources)
 

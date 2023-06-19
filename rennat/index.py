@@ -134,8 +134,31 @@ class Index:
         if not sources:
             sources = self.search_docs(query, k=10)
         
-        chain = load_qa_with_sources_chain(self.llm, chain_type="refine", verbose=verbose)
         #TODO: Original answer remains unchanged. Need to fix this.
+
+        CHAT_REFINE_PROMPT_TMPL = (
+            "The original question is as follows: {question}\n"
+            "We have provided an existing answer, including sources: {existing_answer}\n"
+            "We have the opportunity to refine the existing answer"
+            "(only if needed) with some more context below.\n"
+            "------------\n"
+            "{context_str}\n"
+            "------------\n"
+            "Given the new context, refine the original answer to better "
+            "answer the question. "
+            "If you do update it, please update the sources as well. "
+            "If the context isn't useful, return the original answer."
+            "If the original answer remains unchanged, repeat the original answer."
+        )
+        CHAT_REFINE_PROMPT = PromptTemplate(
+            input_variables=["question", "existing_answer", "context_str"],
+            template=CHAT_REFINE_PROMPT_TMPL,
+        )
+
+        chain = load_qa_with_sources_chain(self.llm, chain_type="refine", 
+                            refine_prompt=CHAT_REFINE_PROMPT, verbose=verbose)
+
+
         answer = chain(
             {"input_documents": sources, "question": query}, return_only_outputs=False
         )
