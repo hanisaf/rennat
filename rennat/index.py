@@ -84,14 +84,14 @@ class Index:
         #     self.collection.delete(where={"name": {"$eq": f}})
         # print("deleted ", len(files), " files")
         # this is a workaround but it's memory intensive
-        if files:
-            results = self.collection.get()
-            ids = results['ids']
-            metadatas = results['metadatas']
-            deleted_ids = [ ids[i] for i in tqdm(range(len(ids))) if metadatas[i]['name'] in files ]
+        results = self.collection.get()
+        ids = results['ids']
+        metadatas = results['metadatas']
+        deleted_ids = [ ids[i] for i in tqdm(range(len(ids))) if metadatas[i]['name'] in files ]
+        if deleted_ids:
             self.collection.delete(ids=deleted_ids)
             self.client.persist()
-            print("deleted ", len(files), " files with", len(deleted_ids), " chunks.")
+        print("deleted ", len(files), " files with", len(deleted_ids), " chunks.")
 
 
     def size(self):
