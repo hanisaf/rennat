@@ -5,6 +5,7 @@ openai>=0.26.2
 docx2txt>=0.8
 pillow>=9.4.0
 pypdf
+EbookLib
 tenacity>=8.2.0
 path>=16.6.0
 tiktoken>=0.4.0

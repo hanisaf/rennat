@@ -44,13 +44,9 @@ class Index:
         self.collection = self.client.get_or_create_collection(name=collection_name)
 
     def delete_collection(self, collection_name) -> None:
-        if collection_name == "references":
-            print("Cannot delete references collection.")
-            return
-        else:
-            self.switch_collection("references")
-            self.client.delete_collection(collection_name)
-            self.client.persist()
+        self.switch_collection("references")
+        self.client.delete_collection(collection_name)
+        self.client.persist()
 
     def list_collections(self) -> List[str]:
         return self.client.list_collections()
@@ -88,13 +84,14 @@ class Index:
         #     self.collection.delete(where={"name": {"$eq": f}})
         # print("deleted ", len(files), " files")
         # this is a workaround but it's memory intensive
-        results = self.collection.get()
-        ids = results['ids']
-        metadatas = results['metadatas']
-        deleted_ids = [ ids[i] for i in tqdm(range(len(ids))) if metadatas[i]['name'] in files ]
-        self.collection.delete(ids=deleted_ids)
-        self.client.persist()
-        print("deleted ", len(files), " files with", len(deleted_ids), " chunks.")
+        if files:
+            results = self.collection.get()
+            ids = results['ids']
+            metadatas = results['metadatas']
+            deleted_ids = [ ids[i] for i in tqdm(range(len(ids))) if metadatas[i]['name'] in files ]
+            self.collection.delete(ids=deleted_ids)
+            self.client.persist()
+            print("deleted ", len(files), " files with", len(deleted_ids), " chunks.")
 
 
     def size(self):

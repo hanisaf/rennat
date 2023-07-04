@@ -316,17 +316,19 @@ if __name__ == "__main__":
     # warnings.filterwarnings("ignore")
     os.environ["TOKENIZERS_PARALLELISM"]="false"
     # check that two arguments are provided if not print usage
-    if len(sys.argv) != 3:
-        print("Usage: python rennat.py <index_file> <openai_token>")
+    if len(sys.argv) != 4:
+        print("Usage: python rennat.py <index_file> <openai_token> <collection_name>")
         index_file = input("Enter the index file name: ").strip()
         openai_token = Util.seek_openai_token().strip()
         if not openai_token:
             openai_token = input("Enter your OpenAI API Token: ")
+        collection_name = input("Enter the collection name: ").strip()
     else:
         index_file = sys.argv[1]
         openai_token = sys.argv[2]
+        collection_name = sys.argv[3]
 
-    rennat = Rennat(index_file, "references", openai_token)
+    rennat = Rennat(index_file, collection_name, openai_token)
     print("Welcome to Rennat!")
     rennat.current_collection()
     while(True):

@@ -11,6 +11,9 @@ from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import docx2txt
 from pypdf import PdfReader
+import ebooklib
+from ebooklib import epub
+
 #from PyPDF4 import PdfFileReader
 from langchain.llms import OpenAI, BaseLLM
 from langchain.chat_models import ChatOpenAI
@@ -32,6 +35,8 @@ class Util:
                 return [Util.parse_txt(file_content, file_name)]
             elif ext.lower() == ".html":
                 return [Util.parse_html(file_content, file_name)]
+            elif ext.lower() == ".epub":
+                return Util.parse_epub(file_content, file_name)
             else:
                 raise ValueError(f"Unknown file extension: {ext}")
 
@@ -69,7 +74,6 @@ class Util:
 
         return output
 
-
     @staticmethod
     def parse_txt(file: BytesIO, name: str = None) -> str:
         text = file.read().decode("utf-8")
@@ -77,6 +81,27 @@ class Util:
         text = re.sub(r"\n\s*\n", "\n\n", text)
         return text
 
+    @staticmethod
+    def parse_epub(file: BytesIO, name: str = None) -> List[str]:
+        """Uses ebooklib to parse an epub file and returns a string.
+           Returns a list of strings, one for each chapter.""" 
+        book = epub.read_epub(name)
+        output = []
+        for item in book.get_items():
+            if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                try:
+                    soup = BeautifulSoup(item.get_content(), 'html.parser')
+                    # get the text out of the soup
+                    text = soup.get_text()
+                    # Remove multiple newlines
+                    text = re.sub(r"\n\s*\n", "\n\n", text)
+                    output.append(text)
+                except Exception as e:
+                    print("Error parsing epub part " + item.get_name(), e)
+        return output
+
+        pass
+    
     @staticmethod
     def text_to_docs(text: str | List[str], name: Optional[str] = None) -> List[Document]:
         """Converts a string or list of strings to a list of Documents
