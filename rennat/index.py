@@ -20,15 +20,18 @@ from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from util import Util
 from langchain.chains.summarize import load_summarize_chain
 from prompts import Prompts
+from chromadb.utils import embedding_functions
 
 class Index:
     
     def __init__(self, index_file: str = None, collection_name: str = "references", openai_token:str = None) -> None:
+        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")#(model_name="all-mpnet-base-v2")
         self.client = chromadb.Client(Settings(
             chroma_db_impl="duckdb+parquet",
             persist_directory=index_file,
             anonymized_telemetry=False,
         ))
+        
         self.switch_collection(collection_name)
         if not openai_token:
             self.openai_token = Util.seek_openai_token()
@@ -41,7 +44,7 @@ class Index:
 
     def switch_collection(self, collection_name: str) -> None:
         self.collection_name = collection_name
-        self.collection = self.client.get_or_create_collection(name=collection_name)
+        self.collection = self.client.get_or_create_collection(name=collection_name, embedding_function=self.embedding_function)
 
     def delete_collection(self, collection_name) -> None:
         self.switch_collection("references")

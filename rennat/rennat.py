@@ -115,8 +115,9 @@ class Rennat:
 
     def delete_files(self):
         files = input("Please enter files to delete (comma separated): ")
-        files = files.split(',')
-        self.index.delete_files(files)
+        if files:
+            files = files.split(',')
+            self.index.delete_files(files)
 
     def delete_collection(self):
         print("WARNING: This will delete the collection and all its contents.")
