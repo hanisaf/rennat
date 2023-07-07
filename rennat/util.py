@@ -191,7 +191,7 @@ class Util:
             model_token_or_path = Util.seek_openai_token()
         
         callbacks=[StreamingStdOutCallbackHandler()]
-        if model_name == "gpt-3.5-turbo":
+        if model_name.startswith("gpt"):
             llm = ChatOpenAI(
                 temperature=temperature, openai_api_key=model_token_or_path, model_name=model_name,
                 streaming=streaming, callbacks=callbacks
