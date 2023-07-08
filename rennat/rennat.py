@@ -43,6 +43,7 @@ class Rennat:
 
 
     def mainmenu(self):
+        print()
         print("----- User -----")
         print("1. Ask a question")
         print("2. Converse with papers")
@@ -50,6 +51,7 @@ class Rennat:
         print("4. Summarize a paper")
         print("----- Advanced -----")
         print("5. Synthesize literature")
+        print("6. One reference answer")
         print("----- Admin -----")
         print("a. List files")
         print("b. List collections")
@@ -70,6 +72,8 @@ class Rennat:
             self.summarize()
         elif choice == '5':
             self.synthesize()
+        elif choice == '6':
+            self.reference_answer()
         elif choice == 'a':
             self.list_files()
         elif choice == 'b':
@@ -237,6 +241,28 @@ class Rennat:
             text = self.index.refine(query, sources, False)
             self.display_results(query, text, meta_names, sources)
 
+    def reference_answer(self):
+        while True:
+            query_modifier = self.read_query()
+            if not query_modifier:
+                break
+            query, modifier = query_modifier
+            docs = self.index.search_docs(query)
+            names = []
+            for doc in docs:
+                if doc.metadata['name'] not in names:
+                    names.append(doc.metadata['name'])
+            i = 0
+            while i < len(names):
+                subset_docs = [doc for doc in docs if doc.metadata['name'] == names[i]]
+                answer, papers, sources = self.index.answer(query, subset_docs, modifier=modifier)
+                self.display_results(query, answer, papers, sources)
+                print("---- ", names[i], " ----")
+                decision = input("do you want to re-answer the question with the next relevant source? (y/n) ")
+                if decision != 'y':   
+                    break             
+                i += 1
+  
     def synthesize(self):
         while True:
             query_modifier = self.read_query()
