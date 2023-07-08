@@ -52,6 +52,7 @@ class Rennat:
         print("----- Advanced -----")
         print("5. Synthesize literature")
         print("6. One reference answer")
+        print("7. Search only")
         print("----- Admin -----")
         print("a. List files")
         print("b. List collections")
@@ -74,6 +75,8 @@ class Rennat:
             self.synthesize()
         elif choice == '6':
             self.reference_answer()
+        elif choice == '7':
+            self.search_only()
         elif choice == 'a':
             self.list_files()
         elif choice == 'b':
@@ -206,9 +209,9 @@ class Rennat:
         for paper in papers:
             print(i, '-', paper)
             i += 1
-
-        print("\n\nFINAL ANSWER")
-        print(answer)
+        if answer:
+            print("\n\nFINAL ANSWER")
+            print(answer)
         print()
     
     def summarize(self):
@@ -241,7 +244,7 @@ class Rennat:
             text = self.index.refine(query, sources, False)
             self.display_results(query, text, meta_names, sources)
 
-    def reference_answer(self):
+    def reference_answer(self, k=25):
         while True:
             query_modifier = self.read_query()
             if not query_modifier:
@@ -252,16 +255,24 @@ class Rennat:
             for doc in docs:
                 if doc.metadata['name'] not in names:
                     names.append(doc.metadata['name'])
-            i = 0
-            while i < len(names):
-                subset_docs = [doc for doc in docs if doc.metadata['name'] == names[i]]
-                answer, papers, sources = self.index.answer(query, subset_docs, modifier=modifier)
+            names = names[:k]
+            selected_names = self.select_from_a_list(names, prompt1="The following sources are found:", prompt2="Select the sources you want to use, enter to select all: ")
+            for name in selected_names:
+                selected_docs = [doc for doc in docs if doc.metadata['name'] == name] 
+                answer, papers, sources = self.index.answer(query, selected_docs, modifier=modifier)
                 self.display_results(query, answer, papers, sources)
-                print("---- ", names[i], " ----")
-                decision = input("do you want to re-answer the question with the next relevant source? (y/n) ")
-                if decision != 'y':   
-                    break             
-                i += 1
+                print("---- ", name, " ----\n")
+
+            # i = 0
+            # while i < len(names):
+            #     subset_docs = [doc for doc in docs if doc.metadata['name'] == names[i]]
+            #     answer, papers, sources = self.index.answer(query, subset_docs, modifier=modifier)
+            #     self.display_results(query, answer, papers, sources)
+            #     print("---- ", names[i], " ----")
+            #     decision = input("do you want to re-answer the question with the next relevant source? (y/n) ")
+            #     if decision != 'y':   
+            #         break             
+            #     i += 1
   
     def synthesize(self):
         while True:
@@ -301,6 +312,26 @@ class Rennat:
                 else:
                     break
 
+    def search_only(self, k=5):
+        while True:
+            query_modifier = self.read_query()
+            if not query_modifier:
+                break
+            query, modifier = query_modifier
+            docs = self.index.search_docs(query)
+            papers = []
+            for doc in docs:
+                if not doc.metadata['name'] in papers:
+                    papers.append(doc.metadata['name']) 
+            for i in range(0, len(papers), k):
+                selected_papers = papers[i:i+k]
+                selected_sources = [doc for doc in docs if doc.metadata['name'] in selected_papers]
+                print(papers[i:i+k])
+                self.display_results(query, None, selected_papers, selected_sources)
+                more = input("do you want to see more sources? (y/n) ")
+                if more != 'y':
+                    break
+      
     def converse(self):
         meta_names = self.select_papers()
         while True:
