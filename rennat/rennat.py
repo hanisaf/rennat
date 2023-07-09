@@ -44,15 +44,16 @@ class Rennat:
 
     def mainmenu(self):
         print()
-        print("----- User -----")
+        print("----- Stable -----")
         print("1. Ask a question")
         print("2. Converse with papers")
         print("3. Chat with a bot")
         print("4. Summarize a paper")
-        print("----- Advanced -----")
-        print("5. Synthesize literature")
-        print("6. One reference answer")
-        print("7. Search only")
+        print("5. One reference answer")
+        print("6. Search only")
+        print("----- Experimental -----")
+        print("7. Synthesize literature")
+
         print("----- Admin -----")
         print("a. List files")
         print("b. List collections")
@@ -72,11 +73,11 @@ class Rennat:
         elif choice == '4':
             self.summarize()
         elif choice == '5':
-            self.synthesize()
-        elif choice == '6':
             self.reference_answer()
-        elif choice == '7':
+        elif choice == '6':
             self.search_only()
+        elif choice == '7':
+            self.synthesize()
         elif choice == 'a':
             self.list_files()
         elif choice == 'b':
@@ -262,17 +263,6 @@ class Rennat:
                 answer, papers, sources = self.index.answer(query, selected_docs, modifier=modifier)
                 self.display_results(query, answer, papers, sources)
                 print("---- ", name, " ----\n")
-
-            # i = 0
-            # while i < len(names):
-            #     subset_docs = [doc for doc in docs if doc.metadata['name'] == names[i]]
-            #     answer, papers, sources = self.index.answer(query, subset_docs, modifier=modifier)
-            #     self.display_results(query, answer, papers, sources)
-            #     print("---- ", names[i], " ----")
-            #     decision = input("do you want to re-answer the question with the next relevant source? (y/n) ")
-            #     if decision != 'y':   
-            #         break             
-            #     i += 1
   
     def synthesize(self):
         while True:

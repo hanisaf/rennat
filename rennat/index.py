@@ -205,7 +205,8 @@ class Index:
         
         if filter:
             relevant_docs = self.collection.get(where=filter)
-            k = len(relevant_docs['ids'])
+            k = min(k, len(relevant_docs['ids']))
+            
         else:
             k = min(k, self.size())
 
