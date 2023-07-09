@@ -57,7 +57,10 @@ if __name__ == "__main__":
     agent=AgentType.CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     handle_parsing_errors=True,
     verbose = True)
-    try:
-        result = agent("what is clan control?") 
-    except: 
-        print("exception on external access")
+    while True:
+        query = input("Enter a question: ")
+        try:
+            result = agent(query) 
+            print(result)
+        except: 
+            print("exception on external access")
